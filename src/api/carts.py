@@ -3,6 +3,9 @@ from pydantic import BaseModel
 from src.api import auth
 from enum import Enum
 
+import sqlalchemy
+from src import database as db
+
 router = APIRouter(
     prefix="/carts",
     tags=["cart"],
@@ -105,5 +108,14 @@ class CartCheckout(BaseModel):
 @router.post("/{cart_id}/checkout")
 def checkout(cart_id: int, cart_checkout: CartCheckout):
     """ """
+    
+    num_green_potions = 0
+    gold = 0
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text("SELECT * from global_inventory"))
+        row = result.one()
+        num_green_potions = row[0]
+        gold = row[2]
+        result = connection.execute(sqlalchemy.text(f"UPDATE global_inventory SET num_green_potions = {num_green_potions-1}, gold = {gold + 48}"))
 
-    return {"total_potions_bought": 1, "total_gold_paid": 50}
+    return {"total_potions_bought": 1, "total_gold_paid": 48}

@@ -116,6 +116,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         row = result.one()
         num_green_potions = row[0]
         gold = row[2]
-        result = connection.execute(sqlalchemy.text(f"UPDATE global_inventory SET num_green_potions = {num_green_potions-1}, gold = {gold + 48}"))
+        result = connection.execute(sqlalchemy.text(f"UPDATE global_inventory SET num_green_potions = {num_green_potions-1}, gold = {gold + 50}"))
 
-    return {"total_potions_bought": 1, "total_gold_paid": 48}
+    return {"total_potions_bought": 1, "total_gold_paid": 50}

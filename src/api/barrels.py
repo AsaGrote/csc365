@@ -34,11 +34,14 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             
     if additional_ml_green > 0:
         with db.engine.begin() as connection:
-            result = connection.execute(sqlalchemy.text("SELECT * from global_inventory"))
+            result = connection.execute(sqlalchemy.text("SELECT num_green_ml, gold from global_inventory"))
             row = result.one()
-            initial_green_ml = row[1]
-            initial_gold = row[2]
-            result = connection.execute(sqlalchemy.text(f"UPDATE global_inventory SET num_green_ml = {initial_green_ml+additional_ml_green}, gold = {initial_gold-gold_spent}"))
+            initial_green_ml = row[0]
+            initial_gold = row[1]
+            result = connection.execute(sqlalchemy.text(f"""
+                    UPDATE global_inventory 
+                    SET num_green_ml = {initial_green_ml+additional_ml_green}, 
+                        gold = {initial_gold-gold_spent}"""))
     
     return "OK"
 
@@ -56,11 +59,14 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     
     # Check if green potion stock is low
     quantity_green_potion = 0
+    gold = 0
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT * from global_inventory"))
-        quantity_green_potion = result.scalar_one()
-
-    if green_barrel_obj and quantity_green_potion < 10:
+        result = connection.execute(sqlalchemy.text("SELECT num_green_potions, gold from global_inventory"))
+        row = result.one()
+        quantity_green_potion = row[0]
+        gold = row[1]
+        
+    if green_barrel_obj and quantity_green_potion < 10 and gold >= green_barrel_obj.price:
         return [
             {
                 "sku": "SMALL_GREEN_BARREL",

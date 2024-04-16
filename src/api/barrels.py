@@ -102,7 +102,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
     order = sorted(potion_inventory, key=lambda potion: potion[1])
     
     for i in range(len(order)):
-        if order[i] == "num_red_potion":
+        if order[i][0] == "num_red_potion":
             if red_barrel_obj and quantity_red_potion < 10 and gold >= red_barrel_obj.price:
                 purchase_plan.append(
                     {
@@ -111,7 +111,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                     }
                 )
                 gold -= red_barrel_obj.price
-        elif order[i] == "num_green_potion":
+        elif order[i][0] == "num_green_potion":
             if green_barrel_obj and quantity_green_potion < 10 and gold >= green_barrel_obj.price:
                 purchase_plan.append(
                     {
@@ -120,7 +120,7 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                     }
                 )
                 gold -= green_barrel_obj.price
-        elif order[i] == "num_blue_potion":
+        elif order[i][0] == "num_blue_potion":
             if blue_barrel_obj and quantity_blue_potion < 10 and gold >= blue_barrel_obj.price:
                 purchase_plan.append(
                     {

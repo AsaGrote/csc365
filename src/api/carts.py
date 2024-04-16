@@ -11,11 +11,11 @@ Global Variables
 Maintain carts globally temporarily. In future versions this will be done with a cart table.
 """
 carts = {}
-cart_id = 1
+current_cart_id = 1
 
 def reset_carts():
     carts = {}
-    cart_id = 1
+    current_cart_id = 1
 
 
 router = APIRouter(
@@ -100,8 +100,9 @@ def post_visits(visit_id: int, customers: list[Customer]):
 @router.post("/")
 def create_cart(new_cart: Customer):
     """ """
-    ret = {"cart_id": cart_id}
-    cart_id += 1
+    global current_cart_id
+    ret = {"cart_id": current_cart_id}
+    current_cart_id += 1
     return ret 
 
 
@@ -113,12 +114,18 @@ class CartItem(BaseModel):
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     """ """
     
+    """ 
+    TODO: Remove things from catalog when they are added to the cart to avoid anomalies
+    """
+    
     if cart_id in carts:
         current_cart = carts[cart_id]
         current_cart.update({item_sku: cart_item.quantity})
         
     else:
         carts[cart_id] = {item_sku: cart_item.quantity}
+    
+    print(carts)
     
     return "OK"
 
@@ -130,6 +137,8 @@ class CartCheckout(BaseModel):
 def checkout(cart_id: int, cart_checkout: CartCheckout):
     """ """
     
+    """ TODO: Audit checkouts to avoid anomalies """
+    
     print(cart_checkout.payment)
     
     num_red_sold = 0
@@ -140,13 +149,13 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     for item_sku, quantity in carts[cart_id].items():
         if item_sku == "RED_POTION_0":
             num_red_sold += quantity
-            gold_paid += quantity + 48
+            gold_paid += quantity * 48
         elif item_sku == "GREEN_POTION_0":
             num_green_sold += quantity
-            gold_paid += quantity + 48
+            gold_paid += quantity * 48
         elif item_sku == "BLUE_POTION_0":
             num_blue_sold += quantity
-            gold_paid += quantity + 48
+            gold_paid += quantity * 48
         
     # Remove cart from carts
     del carts[cart_id]
@@ -163,7 +172,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         result = connection.execute(sqlalchemy.text(
             f"""UPDATE global_inventory 
                 SET num_red_potions = {inital_red_potions-num_red_sold}, 
-                    num_green_potions = {num_green_potions-num_green_sold}, 
+                    num_green_potions = {initial_green_potions-num_green_sold}, 
                     num_blue_potions = {initial_blue_potions-num_blue_sold}, 
                     gold = {initial_gold + gold_paid}"""))
 

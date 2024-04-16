@@ -95,14 +95,14 @@ def get_bottle_plan():
                 "quantity": num_red_potions,
             }
         )
-    elif num_green_potions > 0:
+    if num_green_potions > 0:
         bottle_plan.append(
             {
                 "potion_type": [0, 100, 0, 0],
                 "quantity": num_green_potions,
             }
         )
-    elif num_blue_potions > 0:
+    if num_blue_potions > 0:
         bottle_plan.append(
             {
                 "potion_type": [0, 0, 100, 0],

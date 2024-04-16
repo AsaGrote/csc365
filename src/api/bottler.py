@@ -42,7 +42,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
         with db.engine.begin() as connection:
             result = connection.execute(sqlalchemy.text("""SELECT num_red_potions, 
                     num_green_potions, num_blue_potions, num_red_ml, num_green_ml, 
-                    num_blue_ml, from global_inventory"""))
+                    num_blue_ml from global_inventory"""))
             row = result.one()
             initial_num_red_potions = row[0]
             initial_num_green_potions = row[1]

@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from src.api import auth
 from src.api.carts import reset_carts
 
+import sqlalchemy
+from src import database as db
 
 router = APIRouter(
     prefix="/admin",

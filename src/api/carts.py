@@ -139,7 +139,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     
     """ TODO: Audit checkouts to avoid anomalies """
     
-    print(cart_checkout.payment)
+    print(f"cartCheckout.payment={cart_checkout.payment}")
     
     num_red_sold = 0
     num_green_sold = 0
@@ -155,7 +155,7 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
             gold_paid += quantity * 48
         elif item_sku == "BLUE_POTION_0":
             num_blue_sold += quantity
-            gold_paid += quantity * 48
+            gold_paid += quantity * 58
         
     # Remove cart from carts
     del carts[cart_id]

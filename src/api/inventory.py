@@ -12,8 +12,22 @@ router = APIRouter(
 @router.get("/audit")
 def get_inventory():
     """ """
-    
-    return {"number_of_potions": 0, "ml_in_barrels": 0, "gold": 0}
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(
+            """SELECT num_red_potions, num_green_potions, num_blue_potions,
+                      num_red_ml, num_green_ml, num_blue_ml,
+                      gold from global_inventory"""))
+        row = result.one()
+        num_red_potions = row[0]
+        num_green_potions = row[1]
+        num_blue_potions = row[2]
+        num_red_ml = row[3]
+        num_green_ml = row[4]
+        num_blue_ml = row[5]
+        gold = row[6]
+        total_potions = num_red_potions + num_green_potions + num_blue_potions
+        total_ml = num_red_ml + num_green_ml + num_blue_ml
+    return {"number_of_potions": total_potions, "ml_in_barrels": total_ml, "gold": gold}
 
 # Gets called once a day
 @router.post("/plan")

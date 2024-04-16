@@ -6,6 +6,18 @@ from enum import Enum
 import sqlalchemy
 from src import database as db
 
+""" 
+Global Variables
+Maintain carts globally temporarily. In future versions this will be done with a cart table.
+"""
+carts = {}
+cart_id = 1
+
+def reset_carts():
+    carts = {}
+    cart_id = 1
+
+
 router = APIRouter(
     prefix="/carts",
     tags=["cart"],
@@ -88,7 +100,9 @@ def post_visits(visit_id: int, customers: list[Customer]):
 @router.post("/")
 def create_cart(new_cart: Customer):
     """ """
-    return {"cart_id": 1}
+    ret = {"cart_id": cart_id}
+    cart_id += 1
+    return ret 
 
 
 class CartItem(BaseModel):
@@ -98,7 +112,14 @@ class CartItem(BaseModel):
 @router.post("/{cart_id}/items/{item_sku}")
 def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     """ """
-
+    
+    if cart_id in carts:
+        current_cart = carts[cart_id]
+        current_cart.update({item_sku: cart_item.quantity})
+        
+    else:
+        carts[cart_id] = {item_sku: cart_item.quantity}
+    
     return "OK"
 
 
@@ -109,13 +130,42 @@ class CartCheckout(BaseModel):
 def checkout(cart_id: int, cart_checkout: CartCheckout):
     """ """
     
-    num_green_potions = 0
-    gold = 0
+    print(cart_checkout.payment)
+    
+    num_red_sold = 0
+    num_green_sold = 0
+    num_blue_sold = 0
+    gold_paid = 0
+    
+    for item_sku, quantity in carts[cart_id].items():
+        if item_sku == "RED_POTION_0":
+            num_red_sold += quantity
+            gold_paid += quantity + 48
+        elif item_sku == "GREEN_POTION_0":
+            num_green_sold += quantity
+            gold_paid += quantity + 48
+        elif item_sku == "BLUE_POTION_0":
+            num_blue_sold += quantity
+            gold_paid += quantity + 48
+        
+    # Remove cart from carts
+    del carts[cart_id]
+    
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT num_green_potions, gold from global_inventory"))
+        result = connection.execute(sqlalchemy.text(
+            """SELECT num_red_potions, num_green_potions,
+                      num_blue_potions, gold from global_inventory"""))
         row = result.one()
-        num_green_potions = row[0]
-        gold = row[1]
-        result = connection.execute(sqlalchemy.text(f"UPDATE global_inventory SET num_green_potions = {num_green_potions-1}, gold = {gold + 48}"))
+        inital_red_potions = row[0]
+        initial_green_potions = row[1]
+        initial_blue_potions = row[2]
+        initial_gold = row[3]
+        result = connection.execute(sqlalchemy.text(
+            f"""UPDATE global_inventory 
+                SET num_red_potions = {inital_red_potions-num_red_sold}, 
+                    num_green_potions = {num_green_potions-num_green_sold}, 
+                    num_blue_potions = {initial_blue_potions-num_blue_sold}, 
+                    gold = {initial_gold + gold_paid}"""))
 
-    return {"total_potions_bought": 1, "total_gold_paid": 48}
+    total_sold = num_red_sold + num_green_sold + num_blue_sold
+    return {"total_potions_bought": total_sold, "total_gold_paid": gold_paid}

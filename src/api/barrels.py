@@ -42,7 +42,7 @@ def post_deliver_barrels(barrels_delivered: list[Barrel], order_id: int):
             gold_spent += barrel.price*barrel.quantity
             
     # Update database
-    if additional_ml_green > 0:
+    if gold_spent > 0:
         with db.engine.begin() as connection:
             result = connection.execute(sqlalchemy.text("SELECT num_red_ml, num_green_ml, num_blue_ml, gold from global_inventory"))
             row = result.one()

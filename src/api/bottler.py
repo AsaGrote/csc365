@@ -110,6 +110,7 @@ def get_bottle_plan():
             }
         )
     
+    print(f"BOTTLE PLAN: {bottle_plan}")
     return bottle_plan
 
 if __name__ == "__main__":

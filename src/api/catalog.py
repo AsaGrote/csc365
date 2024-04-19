@@ -56,4 +56,5 @@ def get_catalog():
             }
         )
     
+    print(f"catalog: {catalog}")
     return catalog

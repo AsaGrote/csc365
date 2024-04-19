@@ -177,4 +177,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                     gold = {initial_gold + gold_paid}"""))
 
     total_sold = num_red_sold + num_green_sold + num_blue_sold
+    print(f"""num_red_sold: {num_red_sold}, num_green_sold: {num_green_sold},
+          num_blue_sold: {num_blue_sold}, total_gold_paid: {gold_paid}""")
     return {"total_potions_bought": total_sold, "total_gold_paid": gold_paid}

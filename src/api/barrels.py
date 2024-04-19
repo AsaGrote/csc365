@@ -130,4 +130,6 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                 )
                 gold -= blue_barrel_obj.price
     
+    print(f"PURCHASE PLAN: {purchase_plan}")
+    
     return purchase_plan

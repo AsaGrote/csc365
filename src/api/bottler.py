@@ -38,7 +38,7 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
             used_ml_blue += 100*potion_delivery.quantity
             blue_potions_mixed += potion_delivery.quantity
     
-    if green_potions_mixed > 0:
+    if red_potions_mixed+green_potions_mixed+blue_potions_mixed > 0:
         with db.engine.begin() as connection:
             result = connection.execute(sqlalchemy.text("""SELECT num_red_potions, 
                     num_green_potions, num_blue_potions, num_red_ml, num_green_ml, 

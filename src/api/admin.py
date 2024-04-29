@@ -27,6 +27,10 @@ def reset():
                     num_green_ml = 0, 
                     num_blue_ml = 0, 
                     gold = 100"""))
+        
+        result = connection.execute(sqlalchemy.text(
+            f"""UPDATE potion_mixtures 
+                SET quantity = 0"""))
     
     # Reset carts
     reset_carts()

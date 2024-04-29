@@ -3,6 +3,9 @@ from pydantic import BaseModel
 from src.api import auth
 from enum import Enum
 
+from datetime import datetime
+
+
 import sqlalchemy
 from src import database as db
 
@@ -101,6 +104,15 @@ def post_visits(visit_id: int, customers: list[Customer]):
 def create_cart(new_cart: Customer):
     """ """
     global current_cart_id
+    
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(
+            f"""
+            INSERT INTO carts 
+            (id, customer_id)
+            VALUES
+            ({current_cart_id}, {current_cart_id})"""))
+    
     ret = {"cart_id": current_cart_id}
     current_cart_id += 1
     return ret 
@@ -118,14 +130,14 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     TODO: Remove things from catalog when they are added to the cart to avoid anomalies
     """
     
-    if cart_id in carts:
-        current_cart = carts[cart_id]
-        current_cart.update({item_sku: cart_item.quantity})
-        
-    else:
-        carts[cart_id] = {item_sku: cart_item.quantity}
-    
-    print(carts)
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(
+            f"""
+            INSERT INTO cart_items
+            (cart_id, customer_id, item_sku, quantity)
+            VALUES
+            ({cart_id}, {cart_id}, '{item_sku}', {cart_item.quantity})"""
+        ))
     
     return "OK"
 
@@ -141,42 +153,51 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     
     print(f"cartCheckout.payment={cart_checkout.payment}")
     
-    num_red_sold = 0
-    num_green_sold = 0
-    num_blue_sold = 0
     gold_paid = 0
+    total_sold = 0 
     
-    for item_sku, quantity in carts[cart_id].items():
-        if item_sku == "RED_POTION_0":
-            num_red_sold += quantity
-            gold_paid += quantity * 48
-        elif item_sku == "GREEN_POTION_0":
-            num_green_sold += quantity
-            gold_paid += quantity * 48
-        elif item_sku == "BLUE_POTION_0":
-            num_blue_sold += quantity
-            gold_paid += quantity * 58
-        
-    # Remove cart from carts
-    del carts[cart_id]
+    # items_purchased = {}
+    prices = {}
     
     with db.engine.begin() as connection:
+        
+        # Get current prices
         result = connection.execute(sqlalchemy.text(
-            """SELECT num_red_potions, num_green_potions,
-                      num_blue_potions, gold from global_inventory"""))
-        row = result.one()
-        inital_red_potions = row[0]
-        initial_green_potions = row[1]
-        initial_blue_potions = row[2]
-        initial_gold = row[3]
+            "SELECT item_sku, price from potion_mixtures")
+        )
+        for row in result: 
+            prices[row[0]] = row[1]
+        
+        # Update potion_mixtures and calculate gold 
         result = connection.execute(sqlalchemy.text(
-            f"""UPDATE global_inventory 
-                SET num_red_potions = {inital_red_potions-num_red_sold}, 
-                    num_green_potions = {initial_green_potions-num_green_sold}, 
-                    num_blue_potions = {initial_blue_potions-num_blue_sold}, 
-                    gold = {initial_gold + gold_paid}"""))
-
-    total_sold = num_red_sold + num_green_sold + num_blue_sold
-    print(f"""num_red_sold: {num_red_sold}, num_green_sold: {num_green_sold},
-          num_blue_sold: {num_blue_sold}, total_gold_paid: {gold_paid}""")
+            f"""SELECT item_sku, quantity from cart_items
+                WHERE cart_id = {cart_id}"""))
+        
+        for row in result:
+            # items_purchased[row[0]] = row[1]
+            connection.execute(sqlalchemy.text(
+                f"""UPDATE potion_mixtures
+                    SET quantity = quantity - :purchased
+                    WHERE item_sku = '{row[0]}' """),
+                [{"purchased": row[1]}]
+            )
+            
+            gold_paid += prices[row[0]] * row[1]
+            total_sold += row[1]
+            
+        result = connection.execute(sqlalchemy.text(
+            f"""DELETE from cart_items
+                WHERE cart_id = {cart_id}"""))
+        
+        result = connection.execute(sqlalchemy.text(
+            f"""DELETE from carts
+                WHERE id = {cart_id}"""))
+        
+        # Update gold balance 
+        connection.execute(sqlalchemy.text(
+            f"""UPDATE global_inventory
+                SET gold = gold + :gold_paid"""),
+            [{"gold_paid": gold_paid}]
+        )
+        
     return {"total_potions_bought": total_sold, "total_gold_paid": gold_paid}

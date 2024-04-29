@@ -2,5 +2,9 @@
     "python.formatting.provider": "none",
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "files.associations": {
+        "cpe439-a3-dma-backup2": "c",
+        "cpe439-a3-dma-backup3": "c"
     }
 }

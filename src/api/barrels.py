@@ -77,33 +77,42 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         elif barrel.sku == "SMALL_BLUE_BARREL":
             blue_barrel_obj = barrel
     
-    # Check if green potion stock is low
-    quantity_red_potion = 0
-    quantity_green_potion = 0
-    quantity_blue_potion = 0
+    # Calculate ml inventory
+    num_ml_red = 0
+    num_ml_green = 0
+    num_ml_blue = 0
     gold = 0
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text("SELECT num_red_potions, num_green_potions, num_blue_potions, gold from global_inventory"))
+        # get number ml
+        result = connection.execute(sqlalchemy.text("SELECT num_red_ml, num_green_ml, num_blue_ml, gold from global_inventory"))
         row = result.one()
-        quantity_red_potion = row[0]
-        quantity_green_potion = row[1]
-        quantity_blue_potion = row[2]
+        num_ml_red = row[0]
+        num_ml_green = row[1]
+        num_ml_blue = row[2]
         gold = row[3]
         
-    # Buy as much as possible, prioritizing smallest value of potions first
+        # add potion inventory to ml calculation
+        result = connection.execute(sqlalchemy.text("SELECT num_red_ml, num_green_ml, num_blue_ml, quantity from potion_mixtures"))
+        for row in result:
+            num_ml_red += row[0] * row[3]
+            num_ml_green += row[1] * row[3]
+            num_ml_blue += row[2] * row[3]
+    
+    
+    # Buy as much as possible, prioritizing smallest value of ml first
     purchase_plan = []
     
-    potion_inventory = [
-        ("num_red_potion", quantity_red_potion), 
-        ("num_green_potion", quantity_green_potion),
-        ("num_blue_potion", quantity_blue_potion)
+    ml_inventory = [
+        ("num_ml_red", num_ml_red), 
+        ("num_ml_green", num_ml_green),
+        ("num_ml_blue", num_ml_blue)
     ]
     
-    order = sorted(potion_inventory, key=lambda potion: potion[1])
+    order = sorted(ml_inventory, key=lambda potion: potion[1])
     
     for i in range(len(order)):
-        if order[i][0] == "num_red_potion":
-            if red_barrel_obj and quantity_red_potion < 10 and gold >= red_barrel_obj.price:
+        if order[i][0] == "num_ml_red":
+            if red_barrel_obj and gold >= red_barrel_obj.price:
                 purchase_plan.append(
                     {
                         "sku": "SMALL_RED_BARREL",
@@ -111,8 +120,8 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                     }
                 )
                 gold -= red_barrel_obj.price
-        elif order[i][0] == "num_green_potion":
-            if green_barrel_obj and quantity_green_potion < 10 and gold >= green_barrel_obj.price:
+        elif order[i][0] == "num_ml_green":
+            if green_barrel_obj and gold >= green_barrel_obj.price:
                 purchase_plan.append(
                     {
                         "sku": "SMALL_GREEN_BARREL",
@@ -120,8 +129,8 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                     }
                 )
                 gold -= green_barrel_obj.price
-        elif order[i][0] == "num_blue_potion":
-            if blue_barrel_obj and quantity_blue_potion < 10 and gold >= blue_barrel_obj.price:
+        elif order[i][0] == "num_ml_blue":
+            if blue_barrel_obj and gold >= blue_barrel_obj.price:
                 purchase_plan.append(
                     {
                         "sku": "SMALL_BLUE_BARREL",

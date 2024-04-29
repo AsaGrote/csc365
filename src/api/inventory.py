@@ -17,19 +17,22 @@ def get_inventory():
     """ """
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(
-            """SELECT num_red_potions, num_green_potions, num_blue_potions,
-                      num_red_ml, num_green_ml, num_blue_ml,
+            """SELECT num_red_ml, num_green_ml, num_blue_ml,
                       gold from global_inventory"""))
         row = result.one()
-        num_red_potions = row[0]
-        num_green_potions = row[1]
-        num_blue_potions = row[2]
-        num_red_ml = row[3]
-        num_green_ml = row[4]
-        num_blue_ml = row[5]
-        gold = row[6]
-        total_potions = num_red_potions + num_green_potions + num_blue_potions
+        num_red_ml = row[0]
+        num_green_ml = row[1]
+        num_blue_ml = row[2]
+        gold = row[3]
         total_ml = num_red_ml + num_green_ml + num_blue_ml
+        
+        result = connection.execute(sqlalchemy.text(
+            """SELECT quantity from potion_mixtures"""))
+        
+        total_potions = 0
+        for row in result:
+            total_potions += row[0]
+        
     return {"number_of_potions": total_potions, "ml_in_barrels": total_ml, "gold": gold}
 
 # Gets called once a day

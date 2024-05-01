@@ -25,59 +25,57 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     used_ml_green = 0
     used_ml_blue = 0
     used_ml_dark = 0
-    
+
     # Key = potion_type_tuple
     # Value = id
     local_potion_mixtures = {}
     
-    # Get initial inventory and current potion mixtures
-    with db.engine.begin() as connection:
-        result = connection.execute(
-            sqlalchemy.text(
-                """SELECT num_red_ml, num_green_ml, num_blue_ml, num_dark_ml from global_inventory"""
-            ))
-        row = result.one()
-        initial_red_ml = row[0]
-        initial_green_ml = row[1]
-        initial_blue_ml = row[2]
-        initial_dark_ml = row[3]
-        
-        result = connection.execute(
-            sqlalchemy.text(
-                """SELECT id, num_red_ml, num_green_ml, num_blue_ml, num_dark_ml, quantity from potion_mixtures"""
-            ))
-        for row in result:
-            local_potion_mixtures[(row[1], row[2], row[3], row[4])] = row[0]
-            
     # Key = potion_type_tuple
     # Value = quantity
     update_potion_mixtures = {}
     
+    sql_ml_ledger_string = "INSERT INTO ml_ledger (description, type, change) VALUES"
     for potion_delivery in potions_delivered:
-        if tuple(potion_delivery.potion_type) in local_potion_mixtures:
-            update_potion_mixtures[tuple(potion_delivery.potion_type)] = potion_delivery.quantity
-            
-            used_ml_red += potion_delivery.potion_type[0]
-            used_ml_green += potion_delivery.potion_type[1]
-            used_ml_blue += potion_delivery.potion_type[2]
-            used_ml_dark += potion_delivery.potion_type[3]
+        update_potion_mixtures[tuple(potion_delivery.potion_type)] = potion_delivery.quantity
         
-    # Update ml and potion inventory
+        used_ml_red += potion_delivery.potion_type[0]
+        used_ml_green += potion_delivery.potion_type[1]
+        used_ml_blue += potion_delivery.potion_type[2]
+        used_ml_dark += potion_delivery.potion_type[3]
+        
+        if used_ml_red > 0:
+            sql_ml_ledger_string += f""" ('Mixed potion of type: 
+                {potion_delivery.potion_type}', 'RED', {-used_ml_red}),"""
+        if used_ml_green > 0:
+            sql_ml_ledger_string += f""" ('Mixed potion of type: 
+                {potion_delivery.potion_type}', 'GREEN', {-used_ml_green}),"""
+        if used_ml_blue > 0:
+            sql_ml_ledger_string += f""" ('Mixed potion of type: 
+                {potion_delivery.potion_type}', 'BLUE', {-used_ml_blue}),"""
+        if used_ml_dark > 0:
+            sql_ml_ledger_string += f""" ('Mixed potion of type: 
+                {potion_delivery.potion_type}', 'DARK', {-used_ml_dark}),"""
+    
+    # Remove final comma from sql_ml_ledger_string
+    sql_ml_ledger_string = sql_ml_ledger_string[:-1]
+    
     with db.engine.begin() as connection:
-        result = connection.execute(
-            sqlalchemy.text(f"""UPDATE global_inventory 
-                SET num_red_ml = num_red_ml - :used_ml_red,
-                    num_green_ml = num_green_ml - :used_ml_green,
-                    num_blue_ml = num_blue_ml - :used_ml_blue"""),
-            [{"used_ml_red": used_ml_red, "used_ml_green": used_ml_green, "used_ml_blue": used_ml_blue}]
-        )
-        
+        # Execute ml_ledger update
+        result = connection.execute(sqlalchemy.text(sql_ml_ledger_string))
+        # Update potion ledger
         for potion_type_tuple, quantity in update_potion_mixtures.items():
             result = connection.execute(
-                sqlalchemy.text(f"""UPDATE potion_mixtures 
-                    SET quantity = quantity + :added_quantity
-                    WHERE id = :id"""),
-                [{"added_quantity": quantity, "id": local_potion_mixtures[potion_type_tuple]}]
+                sqlalchemy.text(
+                    f"""
+                    INSERT INTO potion_ledger (potion_id, description, change)
+                    SELECT potion_mixtures.id, 'Mixed potion with type:{potion_type_tuple}', {quantity} 
+                    FROM potion_mixtures
+                    WHERE potion_mixtures.num_red_ml = {potion_type_tuple[0]} AND
+                          potion_mixtures.num_green_ml = {potion_type_tuple[1]} AND
+                          potion_mixtures.num_blue_ml = {potion_type_tuple[2]} AND
+                          potion_mixtures.num_dark_ml = {potion_type_tuple[3]}
+                    """
+                )
             )
         
     return "OK"
@@ -99,12 +97,29 @@ def get_bottle_plan():
     inventory_green_ml = 0
     inventory_blue_ml = 0
     with db.engine.begin() as connection:
-        inventory_result = connection.execute(sqlalchemy.text("SELECT num_red_ml, num_green_ml, num_blue_ml from global_inventory"))
-        row = inventory_result.one()
-        inventory_red_ml = row[0]
-        inventory_green_ml = row[1]
-        inventory_blue_ml = row[2]
+        # Calculate ml inventory
+        inventory_red_ml = connection.execute(sqlalchemy.text(
+            """SELECT COALESCE(SUM(change), 0) 
+            FROM ml_ledger
+            WHERE type = 'RED'
+            """
+        )).scalar_one()
         
+        inventory_green_ml = connection.execute(sqlalchemy.text(
+            """SELECT COALESCE(SUM(change), 0)
+            FROM ml_ledger
+            WHERE type = 'GREEN'
+            """
+        )).scalar_one()
+        
+        inventory_blue_ml = connection.execute(sqlalchemy.text(
+            """SELECT COALESCE(SUM(change), 0)
+            FROM ml_ledger
+            WHERE type = 'BLUE'
+            """
+        )).scalar_one()
+        
+        # Order potion mixtures from lowest quantity to highest quantity
         potion_mixture_result = connection.execute(
             sqlalchemy.text("""SELECT num_red_ml, num_green_ml, num_blue_ml, 
                     quantity from potion_mixtures ORDER BY quantity ASC"""))

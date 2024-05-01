@@ -21,19 +21,13 @@ def reset():
     
     # Reset database
     with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text("DELETE FROM potion_ledger"))
+        result = connection.execute(sqlalchemy.text("DELETE FROM ml_ledger"))
+        result = connection.execute(sqlalchemy.text("DELETE FROM gold_ledger"))
         result = connection.execute(sqlalchemy.text(
-            f"""UPDATE global_inventory 
-                SET num_red_ml = 0, 
-                    num_green_ml = 0, 
-                    num_blue_ml = 0, 
-                    gold = 100"""))
-        
-        result = connection.execute(sqlalchemy.text(
-            f"""UPDATE potion_mixtures 
-                SET quantity = 0"""))
-    
-    # Reset carts
-    reset_carts()
+            f"""INSERT INTO gold_ledger (description, change) 
+                VALUES ('Initial gold', 100)"""
+        ))
     
     return "OK"
 

@@ -156,28 +156,31 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     prices = {}
     
     with db.engine.begin() as connection:
-        
+        # Update potion_ledger
         result = connection.execute(sqlalchemy.text(
-            """
-            UPDATE potion_mixtures
-            SET quantity = potion_mixtures.quantity - cart_items.quantity
-            FROM cart_items
-            WHERE potion_mixtures.id = cart_items.potion_id
-            RETURNING cart_items.quantity, potion_mixtures.price
+            f"""
+            INSERT INTO potion_ledger (potion_id, change, description) 
+            SELECT potion_id, quantity*-1 AS change, 'Checkout cart {cart_id}'
+            FROM cart_items WHERE cart_items.cart_id = {cart_id}
             """)
         )
         
+        # Update gold_ledger
+        result = connection.execute(sqlalchemy.text(
+            f"""
+            SELECT cart_items.quantity, potion_mixtures.price FROM potion_mixtures
+            LEFT JOIN cart_items ON cart_items.potion_id = potion_mixtures.id
+            WHERE cart_items.cart_id = {cart_id}
+            """)
+        )
         for quantity, price in result:
             gold_paid += quantity*price
             total_sold += quantity
 
         result = connection.execute(sqlalchemy.text(
-            """
-            UPDATE global_inventory
-            SET gold = global_inventory.gold - :gold_paid
-            """),
-            [{"gold_paid": gold_paid}]
-        ) 
+            f"""INSERT INTO gold_ledger (description, change) 
+                VALUES ('Checkout cart {cart_id}', {gold_paid})"""
+        ))
         
         result = connection.execute(sqlalchemy.text(
             f"""DELETE from cart_items

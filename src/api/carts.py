@@ -9,17 +9,6 @@ from datetime import datetime
 import sqlalchemy
 from src import database as db
 
-""" 
-Global Variables
-Maintain carts globally temporarily. In future versions this will be done with a cart table.
-"""
-carts = {}
-current_cart_id = 1
-
-def reset_carts():
-    carts = {}
-    current_cart_id = 1
-
 
 router = APIRouter(
     prefix="/carts",
@@ -103,19 +92,26 @@ def post_visits(visit_id: int, customers: list[Customer]):
 @router.post("/")
 def create_cart(new_cart: Customer):
     """ """
-    global current_cart_id
     
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(
             f"""
-            INSERT INTO carts 
-            (id, customer_id)
-            VALUES
-            ({current_cart_id}, {current_cart_id})"""))
+            INSERT INTO customer (customer_name, character_class, level)
+            VALUES ('{new_cart.customer_name}', '{new_cart.character_class}', '{new_cart.level}')
+            RETURNING id"""))
+        
+        customer_id = result.scalar_one()
+        
+        result = connection.execute(sqlalchemy.text(
+            f"""
+            INSERT INTO carts (customer_id)
+            VALUES ('{customer_id}')
+            RETURNING id"""))
+        
+        cart_id = result.scalar_one()
+        
     
-    ret = {"cart_id": current_cart_id}
-    current_cart_id += 1
-    return ret 
+    return {"cart_id": cart_id}
 
 
 class CartItem(BaseModel):
@@ -133,10 +129,10 @@ def set_item_quantity(cart_id: int, item_sku: str, cart_item: CartItem):
     with db.engine.begin() as connection:
         result = connection.execute(sqlalchemy.text(
             f"""
-            INSERT INTO cart_items
-            (cart_id, customer_id, item_sku, quantity)
-            VALUES
-            ({cart_id}, {cart_id}, '{item_sku}', {cart_item.quantity})"""
+            INSERT INTO cart_items (potion_id, cart_id, quantity)
+            SELECT potion_mixtures.id, {cart_id}, {cart_item.quantity}
+            FROM potion_mixtures
+            WHERE potion_mixtures.item_sku = '{item_sku}' """
         ))
     
     return "OK"
@@ -161,30 +157,28 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     
     with db.engine.begin() as connection:
         
-        # Get current prices
         result = connection.execute(sqlalchemy.text(
-            "SELECT item_sku, price from potion_mixtures")
+            """
+            UPDATE potion_mixtures
+            SET quantity = potion_mixtures.quantity - cart_items.quantity
+            FROM cart_items
+            WHERE potion_mixtures.id = cart_items.potion_id
+            RETURNING cart_items.quantity, potion_mixtures.price
+            """)
         )
-        for row in result: 
-            prices[row[0]] = row[1]
         
-        # Update potion_mixtures and calculate gold 
+        for quantity, price in result:
+            gold_paid += quantity*price
+            total_sold += quantity
+
         result = connection.execute(sqlalchemy.text(
-            f"""SELECT item_sku, quantity from cart_items
-                WHERE cart_id = {cart_id}"""))
+            """
+            UPDATE global_inventory
+            SET gold = global_inventory.gold - :gold_paid
+            """),
+            [{"gold_paid": gold_paid}]
+        ) 
         
-        for row in result:
-            # items_purchased[row[0]] = row[1]
-            connection.execute(sqlalchemy.text(
-                f"""UPDATE potion_mixtures
-                    SET quantity = quantity - :purchased
-                    WHERE item_sku = '{row[0]}' """),
-                [{"purchased": row[1]}]
-            )
-            
-            gold_paid += prices[row[0]] * row[1]
-            total_sold += row[1]
-            
         result = connection.execute(sqlalchemy.text(
             f"""DELETE from cart_items
                 WHERE cart_id = {cart_id}"""))
@@ -192,12 +186,5 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
         result = connection.execute(sqlalchemy.text(
             f"""DELETE from carts
                 WHERE id = {cart_id}"""))
-        
-        # Update gold balance 
-        connection.execute(sqlalchemy.text(
-            f"""UPDATE global_inventory
-                SET gold = gold + :gold_paid"""),
-            [{"gold_paid": gold_paid}]
-        )
         
     return {"total_potions_bought": total_sold, "total_gold_paid": gold_paid}

@@ -18,13 +18,18 @@ def get_catalog():
             """SELECT COALESCE(SUM(change), 0) AS quantity, 
                     potion_mixtures.item_sku, potion_mixtures.name,
                     potion_mixtures.price, potion_mixtures.num_red_ml, 
-                    potion_mixtures.num_green_ml, potion_mixtures.num_blue_ml 
+                    potion_mixtures.num_green_ml, potion_mixtures.num_blue_ml,
+                    potion_mixtures.num_dark_ml
                FROM potion_ledger
                LEFT JOIN potion_mixtures ON potion_mixtures.id = potion_ledger.potion_id
                GROUP BY potion_mixtures.item_sku, potion_mixtures.name,
                         potion_mixtures.price, potion_mixtures.num_red_ml, 
-                        potion_mixtures.num_green_ml, potion_mixtures.num_blue_ml"""))
+                        potion_mixtures.num_green_ml, potion_mixtures.num_blue_ml,
+                        potion_mixtures.num_dark_ml"""))
         
+        # TODO: add order and limit to 6 potions
+        
+        # TODO: reference things by name rather than index
         for row in result:
             catalog.append(
                 {

@@ -3,6 +3,8 @@ from enum import Enum
 from pydantic import BaseModel
 from src.api import auth
 
+from src.util import get_ml_color_type
+
 import sqlalchemy
 from src import database as db
 
@@ -21,40 +23,54 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     """ """
     print(f"potions delievered: {potions_delivered} order_id: {order_id}")
     
-    used_ml_red = 0
-    used_ml_green = 0
-    used_ml_blue = 0
-    used_ml_dark = 0
-
-    # Key = potion_type_tuple
-    # Value = id
-    local_potion_mixtures = {}
-    
     # Key = potion_type_tuple
     # Value = quantity
-    update_potion_mixtures = {}
+    update_potion_mixtures = []
     
-    sql_ml_ledger_string = "INSERT INTO ml_ledger (description, type, change) VALUES"
     for potion_delivery in potions_delivered:
         update_potion_mixtures[tuple(potion_delivery.potion_type)] = potion_delivery.quantity
         
-        used_ml_red += potion_delivery.potion_type[0]
-        used_ml_green += potion_delivery.potion_type[1]
-        used_ml_blue += potion_delivery.potion_type[2]
-        used_ml_dark += potion_delivery.potion_type[3]
+        used_ml_red = potion_delivery.potion_type[0]
+        used_ml_green = potion_delivery.potion_type[1]
+        used_ml_blue = potion_delivery.potion_type[2]
+        used_ml_dark = potion_delivery.potion_type[3]
         
         if used_ml_red > 0:
-            sql_ml_ledger_string += f""" ('Mixed potion of type: 
-                {potion_delivery.potion_type}', 'RED', {-used_ml_red}),"""
+            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+                {potion_delivery.potion_type}""", 
+                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "change": -used_ml_red
+            })
         if used_ml_green > 0:
-            sql_ml_ledger_string += f""" ('Mixed potion of type: 
-                {potion_delivery.potion_type}', 'GREEN', {-used_ml_green}),"""
+            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+                {potion_delivery.potion_type}""", 
+                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "change": -used_ml_green
+            })
         if used_ml_blue > 0:
-            sql_ml_ledger_string += f""" ('Mixed potion of type: 
-                {potion_delivery.potion_type}', 'BLUE', {-used_ml_blue}),"""
+            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+                {potion_delivery.potion_type}""", 
+                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "change": -used_ml_blue
+            })
         if used_ml_dark > 0:
-            sql_ml_ledger_string += f""" ('Mixed potion of type: 
-                {potion_delivery.potion_type}', 'DARK', {-used_ml_dark}),"""
+            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+                {potion_delivery.potion_type}""", 
+                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "change": -used_ml_dark
+            })
+                
+    with db.engine.begin() as connection:
+        # Execute ml_ledger update
+        result = connection.execute(
+            sqlalchemy.text(
+                """INSERT INTO ml_ledger ((description, type, change))
+                    VALUES (:description, :type, :change)"""
+            ), 
+            update_potion_mixtures
+        )
+        
+
     
     # Remove final comma from sql_ml_ledger_string
     sql_ml_ledger_string = sql_ml_ledger_string[:-1]

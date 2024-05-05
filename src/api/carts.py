@@ -58,6 +58,33 @@ def search_orders(
     Your results must be paginated, the max results you can return at any
     time is 5 total line items.
     """
+    
+    results = []
+    
+    with db.engine.begin() as connection:
+        result = connection.execute(sqlalchemy.text(
+            f"""
+            SELECT orders.id, customer.customer_name, orders.item_desc, orders.gold, orders.created_at
+            FROM orders 
+            JOIN customer on customer.id = orders.customer_id
+            """
+            # ORDER BY
+        ))
+        
+        for row in result:
+            results.append({
+                "line_item_id": row.id,
+                "item_sku": row.item_desc,
+                "customer_name": row.customer_name,
+                "line_item_total": row.gold,
+                "timestamp": row.created_at,
+            })
+
+    return {
+        "previous": "",
+        "next": "",
+        "results": results,
+    }
 
     return {
         "previous": "",
@@ -152,10 +179,36 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     gold_paid = 0
     total_sold = 0 
     
-    # items_purchased = {}
-    prices = {}
-    
     with db.engine.begin() as connection:
+        # # Update orders table
+        # result = connection.execute(sqlalchemy.text(
+        #     f"""
+        #     INSERT INTO orders (customer_name, item_desc, gold) 
+            
+            
+        #     SELECT customer.customer_name, potion_mixtures.item_sku, cart_items.quantity, potion_mixtures.price
+        #     FROM cart_items
+        #     JOIN potion_mixtures ON potion_mixtures.id = cart_items.potion_id
+        #     JOIN carts ON carts.id = cart_items.cart_id
+        #     JOIN customer ON customer.id = carts.customer_id
+        #     WHERE cart_items.cart_id = {cart_id}
+        #     """)
+        # )
+        # Update orders table
+        result = connection.execute(sqlalchemy.text(
+            f"""
+            INSERT INTO orders (customer_id, item_desc, gold)
+            SELECT
+                carts.customer_id AS customer_id,
+                CONCAT(quantity, ' ', potion_mixtures.name, ' ', 'potion(s)') AS item_desc,
+                cart_items.quantity*potion_mixtures.price AS gold
+            FROM cart_items
+                JOIN potion_mixtures ON potion_mixtures.id = cart_items.potion_id
+                JOIN carts ON carts.id = cart_items.cart_id
+            WHERE cart_items.cart_id = {cart_id}
+            """)
+        )
+        
         # Update potion_ledger
         result = connection.execute(sqlalchemy.text(
             f"""
@@ -182,10 +235,12 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
                 VALUES ('Checkout cart {cart_id}', {gold_paid})"""
         ))
         
+        # Clean up cart_items
         result = connection.execute(sqlalchemy.text(
             f"""DELETE from cart_items
                 WHERE cart_id = {cart_id}"""))
         
+        # Clean up carts
         result = connection.execute(sqlalchemy.text(
             f"""DELETE from carts
                 WHERE id = {cart_id}"""))

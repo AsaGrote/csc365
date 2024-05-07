@@ -125,7 +125,7 @@ def search_orders(
     return {
         "previous": "" if search_page in ["0", ""] else f"{int(search_page)-1}",
         "next": "" if not results_remaining else ("1" if search_page == "" else f"{int(search_page)+1}"),
-        "results": results[:4], #Return only 5 results per page
+        "results": results[:5], #Return only 5 results per page
     }
 
 

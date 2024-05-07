@@ -39,4 +39,4 @@ def get_catalog():
             )
     
     print(f"catalog: {catalog}")
-    return catalog[:5]  # Return only 6 potions
+    return catalog[:6]  # Return only 6 potions

@@ -123,7 +123,7 @@ def search_orders(
     results_remaining = True if len(results) == 6 else False
     
     return {
-        "previous": "" if (search_page == "" or int(search_page) <= 1) else f"{int(search_page)-1}",
+        "previous": "" if search_page in ["0", ""] else f"{int(search_page)-1}",
         "next": "" if not results_remaining else ("1" if search_page == "" else f"{int(search_page)+1}"),
         "results": results[:4], #Return only 5 results per page
     }

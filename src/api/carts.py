@@ -7,6 +7,7 @@ from datetime import datetime
 
 
 import sqlalchemy
+from sqlalchemy import func
 from src import database as db
 
 
@@ -91,7 +92,7 @@ def search_orders(
             orders.c.created_at,
         )
         .join(customer, customer.c.id == orders.c.customer_id)
-        .limit(5)
+        .limit(6)
         .offset(offset)
         .order_by(order_by, orders.c.created_at)
     )
@@ -104,15 +105,8 @@ def search_orders(
     if potion_sku != "":
         stmt = stmt.where(orders.c.item_desc.ilike(f"%{potion_sku}%"))
     
+    num_results_remaining = 0
     with db.engine.begin() as connection:
-        # Collect number of remaining results to set next page
-        num_results = connection.execute(
-            sqlalchemy.text(
-                "SELECT COUNT(*) from orders"
-            )
-        ).scalar_one()
-        num_results_remaining = num_results - offset
-        
         result = connection.execute(stmt)
         
         for row in result:
@@ -124,11 +118,14 @@ def search_orders(
                 "timestamp": row.created_at,
             })
 
+    # There are additional results if there is at least 1 additional result 
+    # after returning 5 results (1+5=6 total)
+    results_remaining = True if len(results) == 6 else False
+    
     return {
         "previous": "" if (search_page == "" or int(search_page) <= 1) else f"{int(search_page)-1}",
-        "next": "" if num_results_remaining <= 5 
-                else ("1" if search_page == "" else f"{int(search_page)+1}"),
-        "results": results,
+        "next": "" if not results_remaining else ("1" if search_page == "" else f"{int(search_page)+1}"),
+        "results": results[:4], #Return only 5 results per page
     }
 
 
@@ -211,20 +208,6 @@ def checkout(cart_id: int, cart_checkout: CartCheckout):
     total_sold = 0 
     
     with db.engine.begin() as connection:
-        # # Update orders table
-        # result = connection.execute(sqlalchemy.text(
-        #     f"""
-        #     INSERT INTO orders (customer_name, item_desc, gold) 
-            
-            
-        #     SELECT customer.customer_name, potion_mixtures.item_sku, cart_items.quantity, potion_mixtures.price
-        #     FROM cart_items
-        #     JOIN potion_mixtures ON potion_mixtures.id = cart_items.potion_id
-        #     JOIN carts ON carts.id = cart_items.cart_id
-        #     JOIN customer ON customer.id = carts.customer_id
-        #     WHERE cart_items.cart_id = {cart_id}
-        #     """)
-        # )
         # Update orders table
         result = connection.execute(sqlalchemy.text(
             f"""

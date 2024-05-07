@@ -111,7 +111,6 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
         gold = result.scalar_one()
         
         # add potion inventory to ml calculation
-        result = connection.execute(sqlalchemy.text("SELECT num_red_ml, num_green_ml, num_blue_ml, quantity from potion_mixtures"))
         result = connection.execute(sqlalchemy.text(
             """SELECT SUM(change) AS quantity, potion_mixtures.num_red_ml, 
                     potion_mixtures.num_green_ml, potion_mixtures.num_blue_ml 
@@ -122,9 +121,9 @@ def get_wholesale_purchase_plan(wholesale_catalog: list[Barrel]):
                         potion_mixtures.num_blue_ml"""
         ))
         for row in result:
-            num_ml_red += row[1] * row[0]
-            num_ml_green += row[2] * row[0]
-            num_ml_blue += row[3] * row[0]
+            num_ml_red += row.num_red_ml * row.quantity
+            num_ml_green += row.num_green_ml * row.quantity
+            num_ml_blue += row.num_blue_ml * row.quantity
     
     
     # Buy as much as possible, prioritizing smallest value of ml first

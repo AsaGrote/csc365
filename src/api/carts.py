@@ -61,15 +61,59 @@ def search_orders(
     
     results = []
     
+    # Use reflection to derive table schema.
+    metadata_obj = sqlalchemy.MetaData()
+    customer = sqlalchemy.Table("customer", metadata_obj, autoload_with=db.engine)
+    orders = sqlalchemy.Table("orders", metadata_obj, autoload_with=db.engine)
+    
+    if sort_col is search_sort_options.customer_name:
+        order_by = customer.c.customer_name
+    elif sort_col is search_sort_options.item_sku:
+        order_by = orders.c.item_desc
+    elif sort_col is search_sort_options.line_item_total:
+        order_by = orders.c.gold
+    elif sort_col is search_sort_options.timestamp:
+        order_by = orders.c.created_at
+    else:
+        assert False
+        
+    # Check if descending
+    if sort_order is search_sort_order.desc:
+        order_by = sqlalchemy.desc(order_by)
+        
+    offset = 0 if search_page == "" else int(search_page)*5
+    stmt = (
+        sqlalchemy.select(
+            orders.c.id,
+            customer.c.customer_name,
+            orders.c.item_desc,
+            orders.c.gold,
+            orders.c.created_at,
+        )
+        .join(customer, customer.c.id == orders.c.customer_id)
+        .limit(5)
+        .offset(offset)
+        .order_by(order_by, orders.c.created_at)
+    )
+    
+    # filter by customer name if param is passed
+    if customer_name != "":
+        stmt = stmt.where(customer.c.customer_name.ilike(f"%{customer_name}%"))
+    
+    # filter by potion_sku if param is passed
+    if potion_sku != "":
+        stmt = stmt.where(orders.c.item_desc.ilike(f"%{potion_sku}%"))
+    
     with db.engine.begin() as connection:
-        result = connection.execute(sqlalchemy.text(
-            f"""
-            SELECT orders.id, customer.customer_name, orders.item_desc, orders.gold, orders.created_at
-            FROM orders 
-            JOIN customer on customer.id = orders.customer_id
-            """
-            # ORDER BY
-        ))
+        # Collect number of remaining results to set next page
+        num_results = connection.execute(
+            sqlalchemy.text(
+                "SELECT COUNT(*) from orders"
+            )
+        ).scalar_one()
+        num_results_remaining = num_results - offset
+        
+        result = connection.execute(stmt)
         
         for row in result:
             results.append({
@@ -81,23 +125,10 @@ def search_orders(
             })
 
     return {
-        "previous": "",
-        "next": "",
+        "previous": "" if (search_page == "" or int(search_page) <= 1) else f"{int(search_page)-1}",
+        "next": "" if num_results_remaining <= 5 
+                else ("1" if search_page == "" else f"{int(search_page)+1}"),
         "results": results,
-    }
-
-    return {
-        "previous": "",
-        "next": "",
-        "results": [
-            {
-                "line_item_id": 1,
-                "item_sku": "1 oblivion potion",
-                "customer_name": "Scaramouche",
-                "line_item_total": 50,
-                "timestamp": "2021-01-01T00:00:00Z",
-            }
-        ],
     }
 
 

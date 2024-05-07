@@ -136,22 +136,22 @@ def get_bottle_plan():
         )).scalar_one()
         
         # Order potion mixtures from lowest quantity to highest quantity
-        potion_mixture_result = connection.execute(
+        result = connection.execute(
             sqlalchemy.text("""
-                SELECT num_red_ml, num_green_ml, num_blue_ml, 
+                SELECT num_red_ml, num_green_ml, num_blue_ml, num_dark_ml,
                        COALESCE(SUM(potion_ledger.change), 0) AS quantity 
                 FROM potion_mixtures 
                 LEFT JOIN potion_ledger ON potion_mixtures.id = potion_ledger.potion_id
-                GROUP BY num_red_ml, num_green_ml, num_blue_ml
+                GROUP BY num_red_ml, num_green_ml, num_blue_ml, num_dark_ml
                 ORDER BY quantity ASC
             """)
         )
-        for row in potion_mixture_result:
-            print(row)
-            red_ml = row[0]
-            green_ml = row[1]
-            blue_ml = row[2]
-            quantity = row[3]
+        for row in result:
+            red_ml = row.num_red_ml
+            green_ml = row.num_green_ml
+            blue_ml = row.num_blue_ml
+            dark_ml = row.num_dark_ml
+            quantity = row.quantity
 
             # Check if we have inventory to mix
             if (inventory_red_ml >= red_ml and 

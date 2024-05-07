@@ -27,19 +27,16 @@ def get_catalog():
                         potion_mixtures.num_green_ml, potion_mixtures.num_blue_ml,
                         potion_mixtures.num_dark_ml"""))
         
-        # TODO: add order and limit to 6 potions
-        
-        # TODO: reference things by name rather than index
         for row in result:
             catalog.append(
                 {
-                    "sku": row[1],
-                    "name": row[2],
-                    "quantity": row[0],
-                    "price": row[3],
-                    "potion_type": [row[4], row[5], row[6], row[7]]
+                    "sku": row.item_sku,
+                    "name": row.name,
+                    "quantity": row.quantity,
+                    "price": row.price,
+                    "potion_type": [row.num_red_ml, row.num_green_ml, row.num_blue_ml, row.num_dark_ml]
                 }
             )
     
     print(f"catalog: {catalog}")
-    return catalog
+    return catalog[:5]  # Return only 6 potions

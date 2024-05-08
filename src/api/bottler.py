@@ -23,76 +23,77 @@ def post_deliver_bottles(potions_delivered: list[PotionInventory], order_id: int
     """ """
     print(f"potions delievered: {potions_delivered} order_id: {order_id}")
     
-    # Key = potion_type_tuple
-    # Value = quantity
-    update_potion_mixtures = []
+    update_ml_ledger = []
+    update_potion_ledger = []
     
     for potion_delivery in potions_delivered:
-        update_potion_mixtures[tuple(potion_delivery.potion_type)] = potion_delivery.quantity
-        
         used_ml_red = potion_delivery.potion_type[0]
         used_ml_green = potion_delivery.potion_type[1]
         used_ml_blue = potion_delivery.potion_type[2]
         used_ml_dark = potion_delivery.potion_type[3]
         
+        ml_color_type = get_ml_color_type(potion_delivery.potion_type)
+        update_potion_ledger.append(
+            {
+                "potion_type": potion_delivery.potion_type,
+                "num_red_ml": potion_delivery.potion_type[0],
+                "num_green_ml": potion_delivery.potion_type[1],
+                "num_blue_ml": potion_delivery.potion_type[2],
+                "num_dark_ml": potion_delivery.potion_type[3],
+                "quantity": potion_delivery.quantity
+            }
+        )
+        
         if used_ml_red > 0:
-            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+            update_ml_ledger.append({"description": f"""Mixed potion of type: 
                 {potion_delivery.potion_type}""", 
-                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "type": ml_color_type, 
                 "change": -used_ml_red
             })
         if used_ml_green > 0:
-            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+            update_ml_ledger.append({"description": f"""Mixed potion of type: 
                 {potion_delivery.potion_type}""", 
-                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "type": ml_color_type, 
                 "change": -used_ml_green
             })
         if used_ml_blue > 0:
-            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+            update_ml_ledger.append({"description": f"""Mixed potion of type: 
                 {potion_delivery.potion_type}""", 
-                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "type": ml_color_type, 
                 "change": -used_ml_blue
             })
         if used_ml_dark > 0:
-            update_potion_mixtures.append({"description": f"""Mixed potion of type: 
+            update_ml_ledger.append({"description": f"""Mixed potion of type: 
                 {potion_delivery.potion_type}""", 
-                "type": {get_ml_color_type(potion_delivery.potion_type)}, 
+                "type": ml_color_type, 
                 "change": -used_ml_dark
             })
                 
     with db.engine.begin() as connection:
-        # Execute ml_ledger update
+        # Update ml_ledger
         result = connection.execute(
             sqlalchemy.text(
-                """INSERT INTO ml_ledger ((description, type, change))
+                """INSERT INTO ml_ledger (description, type, change)
                     VALUES (:description, :type, :change)"""
             ), 
-            update_potion_mixtures
+            update_ml_ledger
         )
         
-
-    
-    # Remove final comma from sql_ml_ledger_string
-    sql_ml_ledger_string = sql_ml_ledger_string[:-1]
-    
-    with db.engine.begin() as connection:
-        # Execute ml_ledger update
-        result = connection.execute(sqlalchemy.text(sql_ml_ledger_string))
-        # Update potion ledger
-        for potion_type_tuple, quantity in update_potion_mixtures.items():
-            result = connection.execute(
-                sqlalchemy.text(
-                    f"""
-                    INSERT INTO potion_ledger (potion_id, description, change)
-                    SELECT potion_mixtures.id, 'Mixed potion with type:{potion_type_tuple}', {quantity} 
+        # Update potion_ledger
+        result = connection.execute(
+            sqlalchemy.text(
+                f"""
+                INSERT INTO potion_ledger (potion_id, description, change)
+                    SELECT potion_mixtures.id, 'Mixed potion with type :potion_type', :quantity 
                     FROM potion_mixtures
-                    WHERE potion_mixtures.num_red_ml = {potion_type_tuple[0]} AND
-                          potion_mixtures.num_green_ml = {potion_type_tuple[1]} AND
-                          potion_mixtures.num_blue_ml = {potion_type_tuple[2]} AND
-                          potion_mixtures.num_dark_ml = {potion_type_tuple[3]}
-                    """
-                )
-            )
+                    WHERE potion_mixtures.num_red_ml = :num_red_ml AND
+                          potion_mixtures.num_green_ml = :num_green_ml AND
+                          potion_mixtures.num_blue_ml = :num_blue_ml AND
+                          potion_mixtures.num_dark_ml = :num_dark_ml
+                """
+            ), 
+            update_potion_ledger
+        )
         
     return "OK"
 
